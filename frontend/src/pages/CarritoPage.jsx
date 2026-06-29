@@ -1,13 +1,49 @@
 import React from 'react';
 import { useCarrito } from '../context/CarritoContext';
+import { useNavigate } from 'react-router-dom';
 
 function CarritoPage() {
   const { carrito, agregarProducto, restarProducto, limpiarCarrito } = useCarrito();
+  const navigate = useNavigate();
 
   const totalCompra = carrito.reduce((acumulador, item) => acumulador + (item.precio * item.cantidad), 0);
 
   const handleConfirmarCompra = () => {
-    alert("¡Pedido procesado de forma local! Guardando estado... ");
+    if (carrito.length === 0) return;
+    const nuevoPedido = {
+      mensajePersonalizado: "Pedido web desde React",
+      total: totalCompra,
+      items: carrito.map(item => ({
+        cantidad: item.cantidad,
+        precioUnitario: item.precio,
+        producto: {
+          id: item.id
+        }
+      }))
+    };
+
+    fetch('http://localhost:8080/api/pedidos', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(nuevoPedido)
+      })
+      .then(async res => {
+        if (res.status === 201 || res.ok) {
+          limpiarCarrito();
+          navigate('/historial', { 
+            state: { mensajeExito: "¡Compra procesada y registrada con éxito!" } 
+          });
+        } else {
+          const errorMsg = await res.text();
+          alert(`Error del servidor: ${errorMsg}`);
+        }
+      })
+      .catch(err => {
+        console.error("Error conectando con Spring Boot:", err);
+        alert("No se pudo conectar con el servidor backend.");
+      });
   };
 
   return (
